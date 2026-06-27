@@ -22,10 +22,10 @@ declare const module: any;
 
 function getCorsOrigins() {
   const defaultOrigins = [
-    "http://86.48.3.184:7002",
-    "http://86.48.3.184:7003",
-    "http://localhost:7003",
-    "http://localhost:7002",
+    "http://86.48.3.184:6002",
+    "http://86.48.3.184:6003",
+    "http://localhost:6003",
+    "http://localhost:6002",
   ];
   const configuredOrigins = process.env.CORS_ORIGINS?.split(",")
     .map((origin) => origin.trim())
