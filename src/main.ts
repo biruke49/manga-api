@@ -24,8 +24,8 @@ function getCorsOrigins() {
   const defaultOrigins = [
     "http://86.48.3.184:6002",
     "http://86.48.3.184:6003",
-    "https://mangadash.betechplc.com/",
-    "https://manga.betechplc.com/",
+    "https://mangadash.betechplc.com",
+    "https://manga.betechplc.com",
     "http://localhost:6003",
     "http://localhost:6002",
   ];
