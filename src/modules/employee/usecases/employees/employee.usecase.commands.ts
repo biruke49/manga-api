@@ -63,8 +63,7 @@ export class EmployeeCommands {
     const employeeDomain = CreateEmployeeCommand.fromCommand(command);
     const employee = await this.employeeRepository.insert(employeeDomain);
     if (employee) {
-      const password = Util.generatePassword(8);
-      // const password = "12345678";
+      const password = command.password;
       const createAccountCommand = new CreateAccountCommand();
       createAccountCommand.email = command.email;
       createAccountCommand.phoneNumber = command.phoneNumber;
@@ -97,7 +96,7 @@ export class EmployeeCommands {
       if (account && account.phoneNumber) {
         const smsCommand = new SendSmsCommand();
         smsCommand.phone = account.phoneNumber;
-        smsCommand.message = `Your VANTAGE admin credentials\nPhone number: ${account.phoneNumber}\nPassword: ${password}.`;
+        smsCommand.message = `Your YISHAK admin credentials\nPhone number: ${account.phoneNumber}\nPassword: ${password}.`;
         void this.appService.sendGeezSMS(smsCommand).catch((error) => {
           console.error("Failed to send employee credential SMS:", error);
         });

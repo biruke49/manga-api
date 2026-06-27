@@ -16,6 +16,9 @@ export class MangaDetailResponse {
   coverImageFilename: string;
 
   @ApiProperty()
+  pdfFilename: string;
+
+  @ApiProperty()
   coverImageUrl: string;
 
   @ApiProperty({ enum: MangaStatus })
@@ -63,6 +66,7 @@ export class MangaDetailResponse {
     response.title = entity.title;
     response.description = entity.description;
     response.coverImageFilename = entity.coverImageFilename;
+    response.pdfFilename = entity.pdfFilename;
     response.status = entity.status;
     response.authorId = entity.authorId;
     response.artist = entity.artist;

@@ -6,6 +6,7 @@ import { CollectionQuery } from "@libs/collection-query/collection-query";
 import { ApiPaginatedResponse } from "@libs/response-format/api-paginated-response";
 import { DataResponseFormat } from "@libs/response-format/data-response-format";
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -132,7 +133,7 @@ export class MangaController {
 
   @Post("update-manga-cover/:id")
   @UseGuards(PermissionsGuard("create-manga"))
-  @UseInterceptors(FileInterceptor("cover"))
+  @UseInterceptors(mangaCoverInterceptor())
   @ApiConsumes("multipart/form-data")
   @ApiOkResponse({ type: MangaResponse })
   async updateMangaCover(
@@ -141,6 +142,19 @@ export class MangaController {
     @UploadedFile() cover: Express.Multer.File
   ) {
     return this.mangaCommands.updateMangaCover(id, cover, user);
+  }
+
+  @Post("update-manga-pdf/:id")
+  @UseGuards(PermissionsGuard("create-manga"))
+  @UseInterceptors(mangaPdfInterceptor())
+  @ApiConsumes("multipart/form-data")
+  @ApiOkResponse({ type: MangaResponse })
+  async updateMangaPdf(
+    @CurrentUser() user: UserInfo,
+    @Param("id") id: string,
+    @UploadedFile() pdf: Express.Multer.File
+  ) {
+    return this.mangaCommands.updateMangaPdf(id, pdf, user);
   }
 
   @Delete("delete-manga/:id")
@@ -152,4 +166,28 @@ export class MangaController {
   ) {
     return this.mangaCommands.deleteManga(id, user);
   }
+}
+
+function mangaCoverInterceptor() {
+  return FileInterceptor("cover", {
+    fileFilter: (request, file, callback) => {
+      if (!file.mimetype?.includes("image")) {
+        return callback(new BadRequestException("Provide a valid image file"), false);
+      }
+      callback(null, true);
+    },
+    limits: { fileSize: Math.pow(1024, Number(process.env.MAX_FILE_SIZE || 4)) },
+  });
+}
+
+function mangaPdfInterceptor() {
+  return FileInterceptor("pdf", {
+    fileFilter: (request, file, callback) => {
+      if (file.mimetype !== "application/pdf") {
+        return callback(new BadRequestException("Provide a valid PDF file"), false);
+      }
+      callback(null, true);
+    },
+    limits: { fileSize: Math.pow(1024, Number(process.env.MAX_FILE_SIZE || 4)) },
+  });
 }

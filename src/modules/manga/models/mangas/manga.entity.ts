@@ -21,6 +21,9 @@ export class MangaEntity extends BaseEntity {
   @Column({ name: "cover_image_filename", nullable: true })
   coverImageFilename: string;
 
+  @Column({ name: "pdf_filename", nullable: true })
+  pdfFilename: string;
+
   @Index()
   @Column({ type: "varchar", default: MangaStatus.Draft })
   status: MangaStatus;

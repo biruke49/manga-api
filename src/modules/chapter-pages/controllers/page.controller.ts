@@ -3,6 +3,7 @@ import { CurrentUser } from "@account/auth/decorators/current-user.decorator";
 import { UserInfo } from "@account/auth/dtos/user-info.dto";
 import { PermissionsGuard } from "@account/auth/guards/permission.quard";
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -48,7 +49,7 @@ export class PageController {
 
   @Post("upload-pages/:chapterId")
   @UseGuards(PermissionsGuard("create-manga"))
-  @UseInterceptors(FilesInterceptor("pages"))
+  @UseInterceptors(chapterPagesInterceptor())
   @ApiConsumes("multipart/form-data")
   @ApiOkResponse({ type: PageResponse, isArray: true })
   async uploadPages(
@@ -79,4 +80,16 @@ export class PageController {
   ) {
     return this.pageCommands.deletePage(id, user);
   }
+}
+
+function chapterPagesInterceptor() {
+  return FilesInterceptor("pages", undefined, {
+    fileFilter: (request, file, callback) => {
+      if (!file.mimetype?.includes("image")) {
+        return callback(new BadRequestException("Provide valid image files"), false);
+      }
+      callback(null, true);
+    },
+    limits: { fileSize: Math.pow(1024, Number(process.env.MAX_FILE_SIZE || 4)) },
+  });
 }

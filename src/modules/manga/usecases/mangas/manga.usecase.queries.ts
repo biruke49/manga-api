@@ -16,13 +16,17 @@ import { ChapterResponse } from "@chapters/usecases/chapters/chapter.response";
 
 @Injectable()
 export class MangaQuery {
+  private readonly coverFolderName: string;
+
   constructor(
     @InjectRepository(MangaEntity)
     private mangaRepository: Repository<MangaEntity>,
     @InjectRepository(ChapterEntity)
     private chapterRepository: Repository<ChapterEntity>,
     private fileManagerService: FileManagerService
-  ) {}
+  ) {
+    this.coverFolderName = process.env.MINIO_MANGA_COVERS_FOLDER || "manga-covers";
+  }
 
   async getManga(id: string): Promise<MangaResponse> {
     const manga = await this.mangaRepository.findOne({ where: { id } });
@@ -149,6 +153,6 @@ export class MangaQuery {
   }
 
   private coverFolder(mangaId: string): string {
-    return `manga-covers/${mangaId}`;
+    return `${this.coverFolderName}/${mangaId}`;
   }
 }

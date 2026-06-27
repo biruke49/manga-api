@@ -19,25 +19,44 @@ export class FileManagerService {
   // constructor(private readonly sftpClient: SftpClientService) {}
   private readonly minioClient: Minio.Client;
   private readonly minioBucketName: string;
+  private readonly minioPublicEndpoint: string;
+  private readonly minioPort?: number;
+  private readonly minioPublicPort?: number;
+  private readonly minioUseSSL: boolean;
+  private readonly minioPublicUseSSL: boolean;
+
   constructor(
     @Inject("DOCUMENTS_SERVICE")
     private documentsClient: ClientProxy
   ) {
     this.minioBucketName = process.env.MINIO_BUCKET_NAME;
     const minioEndpoint = this.cleanEnv(process.env.MINIO_ENDPOINT);
+    this.minioPublicEndpoint =
+      this.cleanEnv(process.env.MINIO_PUBLIC_ENDPOINT) || minioEndpoint;
     const minioAccessKey = this.cleanEnv(process.env.MINIO_ACCESS_KEY);
     const minioSecretKey = this.cleanEnv(process.env.MINIO_SECRET_KEY);
     const minioPort = Number(process.env.MINIO_PORT);
-    const minioUseSSL = this.cleanEnv(process.env.MINIO_USE_SSL).toLowerCase() === "true";
+    const minioPublicPort = Number(process.env.MINIO_PUBLIC_PORT);
+    this.minioPort = Number.isFinite(minioPort) && minioPort > 0 ? minioPort : undefined;
+    this.minioUseSSL = this.cleanEnv(process.env.MINIO_USE_SSL).toLowerCase() === "true";
+    const isPublicEndpointSeparate = this.normalizeEndpoint(this.minioPublicEndpoint) !== this.normalizeEndpoint(minioEndpoint);
+    this.minioPublicPort =
+      Number.isFinite(minioPublicPort) && minioPublicPort > 0
+        ? minioPublicPort
+        : isPublicEndpointSeparate
+          ? undefined
+          : this.minioPort;
+    this.minioPublicUseSSL =
+      this.cleanEnv(process.env.MINIO_PUBLIC_USE_SSL || process.env.MINIO_USE_SSL).toLowerCase() === "true";
     const config: any = {
       endPoint: minioEndpoint,
       accessKey: minioAccessKey,
       secretKey: minioSecretKey,
-      useSSL: minioUseSSL,
+      useSSL: this.minioUseSSL,
     };
 
-    if (Number.isFinite(minioPort) && minioPort > 0) {
-      config.port = minioPort;
+    if (this.minioPort) {
+      config.port = this.minioPort;
     }
 
     this.minioClient = new Minio.Client(config);
@@ -45,6 +64,10 @@ export class FileManagerService {
 
   private cleanEnv(value?: string): string {
     return `${value || ""}`.replace(/^['"]|['"]$/g, "");
+  }
+
+  private normalizeEndpoint(value: string): string {
+    return value.replace(/^https?:\/\//, "").replace(/\/+$/g, "");
   }
 
   async downloadFile(
@@ -148,11 +171,7 @@ export class FileManagerService {
       fileName: fileName,
     };
     try {
-      return await this.minioClient.presignedGetObject(
-        this.minioBucketName,
-        `${folderName}/${fileName}`,
-        24 * 60 * 60
-      );
+      return this.getPublicMinioUrl(folderName, fileName);
     } catch (error) {
       try {
         const data = await firstValueFrom(
@@ -165,6 +184,18 @@ export class FileManagerService {
         throw new Error("Failed to get file");
       }
     }
+  }
+
+  private getPublicMinioUrl(folderName: string, fileName: string): string {
+    const protocol = this.minioPublicUseSSL ? "https" : "http";
+    const endpoint = this.normalizeEndpoint(this.minioPublicEndpoint);
+    const hasPort = /:\d+$/.test(endpoint);
+    const port = this.minioPublicPort && !hasPort ? `:${this.minioPublicPort}` : "";
+    const path = [this.minioBucketName, folderName, fileName]
+      .map((segment) => encodeURIComponent(segment).replace(/%2F/g, "/"))
+      .join("/");
+
+    return `${protocol}://${endpoint}${port}/${path}`;
   }
   async getMimeType(folderName: string, fileName: string) {
     const msg = {

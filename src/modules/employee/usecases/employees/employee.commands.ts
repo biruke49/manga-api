@@ -1,7 +1,7 @@
 import { UserInfo } from "@account/auth/dtos/user-info.dto";
 import { Address } from "@libs/common/address";
 import { ApiProperty } from "@nestjs/swagger";
-import { IsEmail, IsEnum, IsNotEmpty } from "class-validator";
+import { IsEmail, IsEnum, IsNotEmpty, MinLength } from "class-validator";
 import { Gender } from "@libs/common/enums";
 import { EmployeeEntity } from "@employee/models/employees/employee.entity";
 import { EmergencyContact } from "@libs/common/contact-person";
@@ -31,6 +31,10 @@ export class CreateEmployeeCommand {
   address: Address;
   @ApiProperty()
   emergencyContact: EmergencyContact;
+  @ApiProperty()
+  @IsNotEmpty()
+  @MinLength(6)
+  password: string;
   currentUser: UserInfo;
 
   static fromCommand(command: CreateEmployeeCommand): EmployeeEntity {

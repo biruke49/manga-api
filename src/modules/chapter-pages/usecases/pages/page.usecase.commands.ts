@@ -19,6 +19,7 @@ import { v4 as uuidv4 } from "uuid";
 @Injectable()
 export class PageCommands {
   private readonly minioBucketName: string;
+  private readonly pagesFolderName: string;
 
   constructor(
     private pageRepository: PageRepository,
@@ -30,6 +31,7 @@ export class PageCommands {
     private readonly fileManagerService: FileManagerService
   ) {
     this.minioBucketName = process.env.MINIO_BUCKET_NAME;
+    this.pagesFolderName = process.env.MINIO_MANGA_PAGES_FOLDER || "manga-pages";
   }
 
   async uploadPages(
@@ -145,10 +147,12 @@ export class PageCommands {
       this.ensureOwnership(chapter, currentUser);
     }
 
-    await this.fileManagerService.removeFromMinio(
-      this.minioBucketName,
-      `${this.pageFolderFromChapter(page.chapterId)}/${page.imageFilename}`
-    );
+    if (chapter) {
+      await this.fileManagerService.removeFromMinio(
+        this.minioBucketName,
+        `${this.pageFolder(chapter.mangaId, page.chapterId)}/${page.imageFilename}`
+      );
+    }
 
     const result = await this.pageRepository.delete(id);
 
@@ -176,11 +180,7 @@ export class PageCommands {
   }
 
   private pageFolder(mangaId: string, chapterId: string): string {
-    return `manga-pages/${mangaId}/${chapterId}`;
-  }
-
-  private pageFolderFromChapter(chapterId: string): string {
-    return `manga-pages/_/${chapterId}`;
+    return `${this.pagesFolderName}/${mangaId}/${chapterId}`;
   }
 
   private emitActivity(

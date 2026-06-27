@@ -43,6 +43,11 @@ export class CreateMangaCommand {
   @IsBoolean()
   isMature?: boolean;
 
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  pdfFilename?: string;
+
   currentUser?: UserInfo;
 
   static fromCommand(command: CreateMangaCommand, authorId: string): MangaEntity {
@@ -98,6 +103,11 @@ export class UpdateMangaCommand {
   @IsOptional()
   @IsBoolean()
   isMature?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  pdfFilename?: string;
 
   currentUser?: UserInfo;
 }

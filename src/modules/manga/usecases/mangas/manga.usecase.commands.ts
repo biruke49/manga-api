@@ -19,6 +19,8 @@ import { v4 as uuidv4 } from "uuid";
 @Injectable()
 export class MangaCommands {
   private readonly minioBucketName: string;
+  private readonly coverFolderName: string;
+  private readonly pdfFolderName: string;
 
   constructor(
     private mangaRepository: MangaRepository,
@@ -26,6 +28,8 @@ export class MangaCommands {
     private readonly fileManagerService: FileManagerService
   ) {
     this.minioBucketName = process.env.MINIO_BUCKET_NAME;
+    this.coverFolderName = process.env.MINIO_MANGA_COVERS_FOLDER || "manga-covers";
+    this.pdfFolderName = process.env.MINIO_MANGA_PDFS_FOLDER || "manga-pdfs";
   }
 
   async createManga(command: CreateMangaCommand): Promise<MangaResponse> {
@@ -120,6 +124,47 @@ export class MangaCommands {
     return MangaResponse.fromEntity(updated);
   }
 
+  async updateMangaPdf(
+    id: string,
+    file: Express.Multer.File,
+    currentUser?: { id?: string }
+  ): Promise<MangaResponse> {
+    if (!file) {
+      throw new BadRequestException("PDF file is required.");
+    }
+    if (file.mimetype !== "application/pdf") {
+      throw new BadRequestException("Manga PDF must be a PDF file.");
+    }
+
+    const manga = await this.mangaRepository.getById(id);
+    if (!manga) {
+      throw new NotFoundException("Manga not found.");
+    }
+    this.ensureOwnership(manga, currentUser);
+
+    if (manga.pdfFilename) {
+      await this.fileManagerService.removeFromMinio(
+        this.minioBucketName,
+        `${this.pdfFolder(id)}/${manga.pdfFilename}`
+      );
+    }
+
+    const filename = `${uuidv4()}.pdf`;
+    await this.fileManagerService.uploadFileToMinio(
+      this.minioBucketName,
+      `${this.pdfFolder(id)}/${filename}`,
+      file.buffer,
+      file.size,
+      file.mimetype
+    );
+
+    manga.pdfFilename = filename;
+    manga.updatedBy = currentUser?.id;
+    const updated = await this.mangaRepository.update(manga.id, manga);
+    this.emitActivity(updated.id, ACTIONS.UPDATE, currentUser, updated);
+    return MangaResponse.fromEntity(updated);
+  }
+
   async deleteManga(id: string, currentUser?: { id?: string; permissions?: string[] }): Promise<boolean> {
     const manga = await this.mangaRepository.getById(id, [], true);
     if (!manga) {
@@ -143,7 +188,11 @@ export class MangaCommands {
   }
 
   private coverFolder(mangaId: string): string {
-    return `manga-covers/${mangaId}`;
+    return `${this.coverFolderName}/${mangaId}`;
+  }
+
+  private pdfFolder(mangaId: string): string {
+    return `${this.pdfFolderName}/${mangaId}`;
   }
 
   private emitActivity(

@@ -18,13 +18,17 @@ import { PageResponse } from "@chapter-pages/usecases/pages/page.response";
 
 @Injectable()
 export class ChapterQuery {
+  private readonly pagesFolderName: string;
+
   constructor(
     @InjectRepository(ChapterEntity)
     private chapterRepository: Repository<ChapterEntity>,
     @InjectRepository(ChapterPageEntity)
     private pageRepository: Repository<ChapterPageEntity>,
     private fileManagerService: FileManagerService
-  ) {}
+  ) {
+    this.pagesFolderName = process.env.MINIO_MANGA_PAGES_FOLDER || "manga-pages";
+  }
 
   async getChapter(id: string): Promise<ChapterResponse> {
     const chapter = await this.chapterRepository.findOne({
@@ -74,17 +78,18 @@ export class ChapterQuery {
       order: { pageNumber: "ASC" },
     });
     const pageResponses = await Promise.all(
-      pages.map((p) => this.toPageResponse(p))
+      pages.map((p) => this.toPageResponse(p, chapter.mangaId))
     );
     return ReaderResponse.fromEntity(chapter, pageResponses);
   }
 
   private async toPageResponse(
-    entity: ChapterPageEntity
+    entity: ChapterPageEntity,
+    mangaId: string
   ): Promise<PageResponse> {
     const response = PageResponse.fromEntity(entity);
     response.imageUrl = await this.fileManagerService
-      .getFromMinio(`manga-pages/_/${entity.chapterId}`, entity.imageFilename)
+      .getFromMinio(`${this.pagesFolderName}/${mangaId}/${entity.chapterId}`, entity.imageFilename)
       .catch(() => null);
     return response;
   }
