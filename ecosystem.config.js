@@ -1,7 +1,7 @@
 module.exports = {
   apps: [
     {
-      name: 'fleet-api',
+      name: 'manga-api',
       script: 'dist/src/main.js',
       instances: 1,
       env_production: {
