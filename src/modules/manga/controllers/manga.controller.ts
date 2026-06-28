@@ -11,6 +11,7 @@ import {
   Controller,
   Delete,
   Get,
+  Logger,
   Param,
   Post,
   Put,
@@ -43,6 +44,8 @@ import { MangaQuery } from "@manga/usecases/mangas/manga.usecase.queries";
 @ApiResponse({ status: 404, description: "Item not found" })
 @ApiExtraModels(DataResponseFormat)
 export class MangaController {
+  private readonly logger = new Logger(MangaController.name);
+
   constructor(
     private mangaCommands: MangaCommands,
     private mangaQuery: MangaQuery
@@ -105,8 +108,27 @@ export class MangaController {
     @CurrentUser() user: UserInfo,
     @Body() command: CreateMangaCommand
   ) {
-    command.currentUser = user;
-    return this.mangaCommands.createManga(command);
+    const suppliedFields = Object.keys(command).filter(
+      (field) => field !== "currentUser"
+    );
+    this.logger.log(
+      `create-manga started userId=${user?.id || "unknown"} fields=${suppliedFields.join(",") || "none"}`
+    );
+
+    try {
+      command.currentUser = user;
+      const manga = await this.mangaCommands.createManga(command);
+      this.logger.log(
+        `create-manga completed userId=${user?.id || "unknown"} mangaId=${manga.id}`
+      );
+      return manga;
+    } catch (error) {
+      this.logger.error(
+        `create-manga failed userId=${user?.id || "unknown"} error=${this.errorMessage(error)}`,
+        error instanceof Error ? error.stack : undefined
+      );
+      throw error;
+    }
   }
 
   @Put("update-manga")
@@ -116,8 +138,31 @@ export class MangaController {
     @CurrentUser() user: UserInfo,
     @Body() command: UpdateMangaCommand
   ) {
-    command.currentUser = user;
-    return this.mangaCommands.updateManga(command);
+    const changedFields = Object.keys(command).filter(
+      (field) => field !== "id" && field !== "currentUser"
+    );
+    this.logger.log(
+      `update-manga started userId=${user?.id || "unknown"} mangaId=${command.id || "unknown"} fields=${changedFields.join(",") || "none"}`
+    );
+
+    try {
+      command.currentUser = user;
+      const manga = await this.mangaCommands.updateManga(command);
+      this.logger.log(
+        `update-manga completed userId=${user?.id || "unknown"} mangaId=${manga.id}`
+      );
+      return manga;
+    } catch (error) {
+      this.logger.error(
+        `update-manga failed userId=${user?.id || "unknown"} mangaId=${command.id || "unknown"} error=${this.errorMessage(error)}`,
+        error instanceof Error ? error.stack : undefined
+      );
+      throw error;
+    }
+  }
+
+  private errorMessage(error: unknown): string {
+    return error instanceof Error ? error.message : "Unknown error";
   }
 
   @Put("update-manga-status")
