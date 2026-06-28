@@ -3,6 +3,7 @@ import {
   BadRequestException,
   Inject,
   Injectable,
+  Logger,
   StreamableFile,
 } from "@nestjs/common";
 import { createReadStream } from "fs";
@@ -17,6 +18,7 @@ import { v4 as uuidv4 } from "uuid";
 @Injectable()
 export class FileManagerService {
   // constructor(private readonly sftpClient: SftpClientService) {}
+  private readonly logger = new Logger(FileManagerService.name);
   private readonly minioClient: Minio.Client;
   private readonly minioPublicClient: Minio.Client;
   private readonly minioBucketName: string;
@@ -30,6 +32,14 @@ export class FileManagerService {
     @Inject("DOCUMENTS_SERVICE")
     private documentsClient: ClientProxy
   ) {
+    const rabbitMqUrl = this.cleanEnv(process.env.RABBITMQ_URL);
+    const maskedRabbitMqUrl = rabbitMqUrl.replace(
+      /:\/\/([^:]+):([^@]+)@/,
+      "://$1:***@"
+    );
+    this.logger.log(
+      `Documents RabbitMQ target=${maskedRabbitMqUrl || "not-configured"} queue=documents_queue`
+    );
     this.minioBucketName = process.env.MINIO_BUCKET_NAME;
     const minioEndpoint = this.cleanEnv(process.env.MINIO_ENDPOINT);
     this.minioPublicEndpoint =
@@ -190,12 +200,23 @@ export class FileManagerService {
 				60 * 60
 			);
     } catch (error) {
+      const rabbitStartedAt = Date.now();
+      this.logger.warn(
+        `MinIO get failed; RabbitMQ fallback started target=documents_queue pattern=get-file timeoutMs=10000`
+      );
       try {
         const data = await firstValueFrom(
           this.documentsClient.send<string>("get-file", msg).pipe(timeout(10000))
         );
+        this.logger.log(
+          `RabbitMQ get-file completed elapsedMs=${Date.now() - rabbitStartedAt}`
+        );
         return data;
       } catch (fallbackError) {
+        this.logger.error(
+          `RabbitMQ get-file failed elapsedMs=${Date.now() - rabbitStartedAt}`,
+          fallbackError instanceof Error ? fallbackError.stack : undefined
+        );
         console.error("Minio get error:", error);
         console.error("Documents get fallback error:", fallbackError);
         throw new Error("Failed to get file");
@@ -264,12 +285,23 @@ export class FileManagerService {
       );
       return fileName;
     } catch (error) {
+      const rabbitStartedAt = Date.now();
+      this.logger.warn(
+        `MinIO upload failed; RabbitMQ fallback started target=documents_queue pattern=upload-file object=${fileName} timeoutMs=10000`
+      );
       try {
         const data = await firstValueFrom(
           this.documentsClient.send<string>("upload-file", msg).pipe(timeout(10000))
         );
+        this.logger.log(
+          `RabbitMQ upload-file completed object=${fileName} elapsedMs=${Date.now() - rabbitStartedAt}`
+        );
         return data;
       } catch (fallbackError) {
+        this.logger.error(
+          `RabbitMQ upload-file failed object=${fileName} elapsedMs=${Date.now() - rabbitStartedAt}`,
+          fallbackError instanceof Error ? fallbackError.stack : undefined
+        );
         console.error("Minio upload error:", error);
         console.error("Documents upload fallback error:", fallbackError);
         throw new BadRequestException("Upload failed.");
