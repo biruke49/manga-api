@@ -17,6 +17,7 @@ import { ChapterResponse } from "@chapters/usecases/chapters/chapter.response";
 @Injectable()
 export class MangaQuery {
   private readonly coverFolderName: string;
+	private readonly pdfFolderName: string;
 
   constructor(
     @InjectRepository(MangaEntity)
@@ -26,6 +27,7 @@ export class MangaQuery {
     private fileManagerService: FileManagerService
   ) {
     this.coverFolderName = process.env.MINIO_MANGA_COVERS_FOLDER || "manga-covers";
+		this.pdfFolderName = process.env.MINIO_MANGA_PDFS_FOLDER || "manga-pdfs";
   }
 
   async getManga(id: string): Promise<MangaResponse> {
@@ -101,6 +103,11 @@ export class MangaQuery {
         .getFromMinio(this.coverFolder(manga.id), manga.coverImageFilename)
         .catch(() => null);
     }
+		if (manga.pdfFilename) {
+			response.pdfUrl = await this.fileManagerService
+				.getFromMinio(this.pdfFolder(manga.id), manga.pdfFilename)
+				.catch(() => null);
+		}
     return response;
   }
 
@@ -149,10 +156,19 @@ export class MangaQuery {
         .getFromMinio(this.coverFolder(entity.id), response.coverImageFilename)
         .catch(() => null);
     }
+		if (response.pdfFilename) {
+			response.pdfUrl = await this.fileManagerService
+				.getFromMinio(this.pdfFolder(entity.id), response.pdfFilename)
+				.catch(() => null);
+		}
     return response;
   }
 
   private coverFolder(mangaId: string): string {
     return `${this.coverFolderName}/${mangaId}`;
   }
+
+	private pdfFolder(mangaId: string): string {
+		return `${this.pdfFolderName}/${mangaId}`;
+	}
 }

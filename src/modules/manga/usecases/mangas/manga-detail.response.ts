@@ -21,6 +21,9 @@ export class MangaDetailResponse {
   @ApiProperty()
   coverImageUrl: string;
 
+	@ApiProperty()
+	pdfUrl: string;
+
   @ApiProperty({ enum: MangaStatus })
   status: MangaStatus;
 

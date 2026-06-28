@@ -18,6 +18,7 @@ import { v4 as uuidv4 } from "uuid";
 export class FileManagerService {
   // constructor(private readonly sftpClient: SftpClientService) {}
   private readonly minioClient: Minio.Client;
+  private readonly minioPublicClient: Minio.Client;
   private readonly minioBucketName: string;
   private readonly minioPublicEndpoint: string;
   private readonly minioPort?: number;
@@ -60,6 +61,17 @@ export class FileManagerService {
     }
 
     this.minioClient = new Minio.Client(config);
+
+		const publicConfig: Minio.ClientOptions = {
+			endPoint: this.normalizeEndpoint(this.minioPublicEndpoint),
+			accessKey: minioAccessKey,
+			secretKey: minioSecretKey,
+			useSSL: this.minioPublicUseSSL,
+		};
+		if (this.minioPublicPort) {
+			publicConfig.port = this.minioPublicPort;
+		}
+		this.minioPublicClient = new Minio.Client(publicConfig);
   }
 
   private cleanEnv(value?: string): string {
@@ -171,7 +183,12 @@ export class FileManagerService {
       fileName: fileName,
     };
     try {
-      return this.getPublicMinioUrl(folderName, fileName);
+			const objectPath = [folderName, fileName].filter(Boolean).join("/");
+			return await this.minioPublicClient.presignedGetObject(
+				this.minioBucketName,
+				objectPath,
+				60 * 60
+			);
     } catch (error) {
       try {
         const data = await firstValueFrom(
@@ -186,17 +203,6 @@ export class FileManagerService {
     }
   }
 
-  private getPublicMinioUrl(folderName: string, fileName: string): string {
-    const protocol = this.minioPublicUseSSL ? "https" : "http";
-    const endpoint = this.normalizeEndpoint(this.minioPublicEndpoint);
-    const hasPort = /:\d+$/.test(endpoint);
-    const port = this.minioPublicPort && !hasPort ? `:${this.minioPublicPort}` : "";
-    const path = [this.minioBucketName, folderName, fileName]
-      .map((segment) => encodeURIComponent(segment).replace(/%2F/g, "/"))
-      .join("/");
-
-    return `${protocol}://${endpoint}${port}/${path}`;
-  }
   async getMimeType(folderName: string, fileName: string) {
     const msg = {
       folderName: folderName,
